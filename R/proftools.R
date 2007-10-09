@@ -71,7 +71,13 @@ doProfileLines <- function (fun, filename = "Rprof.out", chunksize = 5000) {
         if (nread == 0) 
             break
         count <- count + nread
-        stripQuotes <- function(x) substr(x, 2, nchar(x) - 1)
+        ## Hack to deal with the fact that on windows there are no
+        ## quotes to strip (as of 2.6.0 at least). It should be safe
+        ## and sufficient to look at the first entry.
+        if (substr(chunk[[1]], 1, 1) == "\"")
+            stripQuotes <- function(x) substr(x, 2, nchar(x) - 1)
+        else stripQuotes <- function(x) x
+        ##stripQuotes <- function(x) substr(x, 2, nchar(x) - 1)
         for (line in lapply(strsplit(chunk, " "), stripQuotes))
             fun(line)
         if (nread < chunksize) 
@@ -179,6 +185,25 @@ lineEdges <- function(line) {
     if (length(line) > 1) {
         rest <- line[-1]
         from <- .Internal(unique(rest))
+        edges <- rep(list(character(0)), length(from))
+        idx <- charMatch(rest, from)
+        for (i in 1 : (length(line) - 1)) {
+            j <- idx[i]
+            callee <- line[i]
+            callerEdges <- edges[[j]]
+            if (! .Internal(match(callee, callerEdges, 0)))
+                edges[[j]] <- c(callerEdges, callee)
+        }
+        list(nodes = from, edges = edges)
+    }
+}
+
+#but have to back out inline of .Internal(unique(...)) because of
+#second argument in 2.6.0
+lineEdges <- function(line) {
+    if (length(line) > 1) {
+        rest <- line[-1]
+        from <- unique(rest)
         edges <- rep(list(character(0)), length(from))
         idx <- charMatch(rest, from)
         for (i in 1 : (length(line) - 1)) {

@@ -1,6 +1,0 @@
-flatProfile             Flat Profile for Rprof Profile Data
-plotProfileCallGraph    Plot Call Graph for Rprof Profile Data
-printProfileCallGraph   Print Call Graph for Rprof Profile Data
-profileCallGraph2Dot    Write Call Graph for Rprof Profile Data to
-                        Graphviz Dot File
-readProfileData         Read Rprof Profile Data
