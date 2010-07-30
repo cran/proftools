@@ -75,6 +75,5 @@ plotProfileCallGraph(pd, layout = "dot", score = c("total", "self"),
      unlink(tmp)
   }
 }
-}
 \keyword{programming}
 \keyword{utilities}
