@@ -161,10 +161,10 @@ rawProfCallGraph <- function(filename = "Rprof.out", chunksize = 5000) {
 # fast(er) versions of match , %in%, when args are guaranteed to be
 # character vectors
 charMatch <- function(x, table, nomatch = NA)
-    .Internal(match(x, table, nomatch))
+    .Internal(match(x, table, nomatch, NULL))
 
 isIn <- function(x, table)
-    .Internal(match(x, table, 0))
+    .Internal(match(x, table, 0, NULL))
 
 lineEdges <- function(line) {
     if (length(line) > 1) {
@@ -191,7 +191,7 @@ lineEdges <- function(line) {
             j <- idx[i]
             callee <- line[i]
             callerEdges <- edges[[j]]
-            if (! .Internal(match(callee, callerEdges, 0)))
+            if (! .Internal(match(callee, callerEdges, 0, NULL)))
                 edges[[j]] <- c(callerEdges, callee)
         }
         list(nodes = from, edges = edges)
@@ -210,7 +210,7 @@ lineEdges <- function(line) {
             j <- idx[i]
             callee <- line[i]
             callerEdges <- edges[[j]]
-            if (! .Internal(match(callee, callerEdges, 0)))
+            if (! .Internal(match(callee, callerEdges, 0, NULL)))
                 edges[[j]] <- c(callerEdges, callee)
         }
         list(nodes = from, edges = edges)
