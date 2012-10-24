@@ -90,50 +90,50 @@ doProfileLines <- function (fun, filename = "Rprof.out", chunksize = 5000) {
 # **** need more abstraction here?
 makeProfCallGraphData <- function() mkHash()
 getProfCallGraphNodeEntry <- function(name, env)
-    get(name, env = env)
+    get(name, envir = env)
 
 incProfCallGraphNodeEntry <- function(name, what, env) {
-    if (exists(name, env = env, inherits = FALSE))
-        entry <- get(name, env = env)
+    if (exists(name, envir = env, inherits = FALSE))
+        entry <- get(name, envir = env)
     else 
         entry <- list(self = 0, total = 0, edges = mkHash())
     entry[[what]] <- entry[[what]] + 1
-    assign(name, entry, env = env)    
+    assign(name, entry, envir = env)    
 }
 
 # **** speed up by inlining
-incProfCallGraphNodeEntry <- function(name, what, env) {
-    if (.Internal(exists(name, env, "any", FALSE)))
-        entry <- .Internal(get(name, env, "any", FALSE))
-    else 
-        entry <- list(self = 0, total = 0, edges = mkHash())
-    entry[[what]] <- entry[[what]] + 1
-    .Internal(assign(name, entry, env, FALSE))
-}
+## incProfCallGraphNodeEntry <- function(name, what, env) {
+##     if (.Internal(exists(name, env, "any", FALSE)))
+##         entry <- .Internal(get(name, env, "any", FALSE))
+##     else 
+##         entry <- list(self = 0, total = 0, edges = mkHash())
+##     entry[[what]] <- entry[[what]] + 1
+##     .Internal(assign(name, entry, env, FALSE))
+## }
 
 getProfCallGraphEdgeEntry <- function(from, to, env) {
     fromEntry <- getProfCallGraphNodeEntry(from, env)
-    get(to, env = fromEntry$edges)
+    get(to, envir = fromEntry$edges)
 }
 
 incProfCallGraphEdgeEntry <- function(from, to, what, env) {
     fromEntry <- getProfCallGraphNodeEntry(from, env)
-    if (exists(to, env = fromEntry$edges, inherits = FALSE))
-        entry <- get(to, env = fromEntry$edges)
+    if (exists(to, envir = fromEntry$edges, inherits = FALSE))
+        entry <- get(to, envir = fromEntry$edges)
     else entry <- list(self = 0, total = 0)
     entry[[what]] <- entry[[what]] + 1
-    assign(to, entry, env = fromEntry$edges)
+    assign(to, entry, envir = fromEntry$edges)
 }
 
 # **** speed up by inlining
-incProfCallGraphEdgeEntry <- function(from, to, what, env) {
-    fromEntry <- .Internal(get(from, env, "any", FALSE))
-    if (.Internal(exists(to, fromEntry$edges, "any", FALSE)))
-        entry <- .Internal(get(to, fromEntry$edges, "any", FALSE))
-    else entry <- list(self = 0, total = 0)
-    entry[[what]] <- entry[[what]] + 1
-    .Internal(assign(to, entry, fromEntry$edges, FALSE))
-}
+## incProfCallGraphEdgeEntry <- function(from, to, what, env) {
+##     fromEntry <- .Internal(get(from, env, "any", FALSE))
+##     if (.Internal(exists(to, fromEntry$edges, "any", FALSE)))
+##         entry <- .Internal(get(to, fromEntry$edges, "any", FALSE))
+##     else entry <- list(self = 0, total = 0)
+##     entry[[what]] <- entry[[what]] + 1
+##     .Internal(assign(to, entry, fromEntry$edges, FALSE))
+## }
 # **** For long Rprof output files this and addCycleInfo are the bottle necks.
 # **** lineEdges is slow, as are the increment functions.
 # **** need to pre-compute stuff like node list, edge lists, etc
@@ -160,11 +160,17 @@ rawProfCallGraph <- function(filename = "Rprof.out", chunksize = 5000) {
 
 # fast(er) versions of match , %in%, when args are guaranteed to be
 # character vectors
+## charMatch <- function(x, table, nomatch = NA)
+##     .Internal(match(x, table, nomatch, NULL))
+
+## isIn <- function(x, table)
+##     .Internal(match(x, table, 0, NULL))
+
 charMatch <- function(x, table, nomatch = NA)
-    .Internal(match(x, table, nomatch, NULL))
+    match(x, table, nomatch)
 
 isIn <- function(x, table)
-    .Internal(match(x, table, 0, NULL))
+    match(x, table, 0)
 
 lineEdges <- function(line) {
     if (length(line) > 1) {
@@ -181,50 +187,52 @@ lineEdges <- function(line) {
 
 # **** somewhat faster by itself
 # **** byte code compiler does better compiling this
-lineEdges <- function(line) {
-    if (length(line) > 1) {
-        rest <- line[-1]
-        from <- .Internal(unique(rest))
-        edges <- rep(list(character(0)), length(from))
-        idx <- charMatch(rest, from)
-        for (i in 1 : (length(line) - 1)) {
-            j <- idx[i]
-            callee <- line[i]
-            callerEdges <- edges[[j]]
-            if (! .Internal(match(callee, callerEdges, 0, NULL)))
-                edges[[j]] <- c(callerEdges, callee)
-        }
-        list(nodes = from, edges = edges)
-    }
-}
+## lineEdges <- function(line) {
+##     if (length(line) > 1) {
+##         rest <- line[-1]
+##         from <- .Internal(unique(rest))
+##         edges <- rep(list(character(0)), length(from))
+##         idx <- charMatch(rest, from)
+##         for (i in 1 : (length(line) - 1)) {
+##             j <- idx[i]
+##             callee <- line[i]
+##             callerEdges <- edges[[j]]
+##             if (! .Internal(match(callee, callerEdges, 0, NULL)))
+##                 edges[[j]] <- c(callerEdges, callee)
+##         }
+##         list(nodes = from, edges = edges)
+##     }
+## }
 
 #but have to back out inline of .Internal(unique(...)) because of
 #second argument in 2.6.0
-lineEdges <- function(line) {
-    if (length(line) > 1) {
-        rest <- line[-1]
-        from <- unique(rest)
-        edges <- rep(list(character(0)), length(from))
-        idx <- charMatch(rest, from)
-        for (i in 1 : (length(line) - 1)) {
-            j <- idx[i]
-            callee <- line[i]
-            callerEdges <- edges[[j]]
-            if (! .Internal(match(callee, callerEdges, 0, NULL)))
-                edges[[j]] <- c(callerEdges, callee)
-        }
-        list(nodes = from, edges = edges)
-    }
-}
+## lineEdges <- function(line) {
+##     if (length(line) > 1) {
+##         rest <- line[-1]
+##         from <- unique(rest)
+##         edges <- rep(list(character(0)), length(from))
+##         idx <- charMatch(rest, from)
+##         for (i in 1 : (length(line) - 1)) {
+##             j <- idx[i]
+##             callee <- line[i]
+##             callerEdges <- edges[[j]]
+##             if (! .Internal(match(callee, callerEdges, 0, NULL)))
+##                 edges[[j]] <- c(callerEdges, callee)
+##         }
+##         list(nodes = from, edges = edges)
+##     }
+## }
 # **** fast(er) version of ls for env, all = TRUE
+## lsEnv <- function(env)
+##     .Internal(ls(env, TRUE))
 lsEnv <- function(env)
-    .Internal(ls(env, TRUE))
+    ls(env, all.names = TRUE)
 
 profCallGraphEdges <- function(pd) {
     edges <- mkHash()
     for (from in lsEnv(pd$data)) {
         entry <- getProfCallGraphNodeEntry(from, pd$data)
-        assign(from, lsEnv(entry$edges), env = edges)
+        assign(from, lsEnv(entry$edges), envir = edges)
     }
     edges
 }
@@ -246,7 +254,7 @@ makeCycleMap <- function(cycles) {
     cycleMap <- mkHash()
     for (i in seq(along = cycles))
         for (n in cycles[[i]])
-            assign(n, paste("<cycle ", i, ">", sep = ""), env = cycleMap)
+            assign(n, paste("<cycle ", i, ">", sep = ""), envir = cycleMap)
     cycleMap
 }
 
@@ -260,16 +268,16 @@ findReachable2 <- function(names, r1) {
     val <- mkHash()
     for (n in names) {
         toenv <- mkHash()
-        for (to in lsEnv(get(n, env = r1)))
-            assign(to, TRUE, env = toenv)
-        assign(n, toenv, env = val)
+        for (to in lsEnv(get(n, envir = r1)))
+            assign(to, TRUE, envir = toenv)
+        assign(n, toenv, envir = val)
     }
     for (n in names) {
-        toenv <- get(n, env = r1)
-        toenv2 <- get(n, env = val)
+        toenv <- get(n, envir = r1)
+        toenv2 <- get(n, envir = val)
         for (to in lsEnv(toenv))
-            for (to2 in lsEnv(get(to, env = r1)))
-                assign(to2, TRUE, env = toenv2)
+            for (to2 in lsEnv(get(to, envir = r1)))
+                assign(to2, TRUE, envir = toenv2)
     }
     val
 }
@@ -278,12 +286,12 @@ findReachable2 <- function(names, r1) {
 findReachable2x <- function(names, r1) {
     val <- mkHash()
     for (n in names) {
-        toenv <- get(n, env = r1)
+        toenv <- get(n, envir = r1)
         toenv2 <- mkHash()
         for (to in lsEnv(toenv))
-            for (to2 in lsEnv(get(to, env = r1)))
-                assign(to2, TRUE, env = toenv2)
-        assign(n, toenv2, env = val)
+            for (to2 in lsEnv(get(to, envir = r1)))
+                assign(to2, TRUE, envir = toenv2)
+        assign(n, toenv2, envir = val)
     }
     val
 }
@@ -291,10 +299,10 @@ findReachable2x <- function(names, r1) {
 # **** in-place update (not same but should end up with same result in end?)
 findReachable2xx <- function(names, rg) {
     for (n in names) {
-        toenv <- get(n, env = rg)
+        toenv <- get(n, envir = rg)
         for (to in lsEnv(toenv))
-            for (to2 in lsEnv(get(to, env = rg)))
-                assign(to2, TRUE, env = toenv)
+            for (to2 in lsEnv(get(to, envir = rg)))
+                assign(to2, TRUE, envir = toenv)
     }
     rg
 }
@@ -304,10 +312,10 @@ findReachable <- function(edges) {
     names <- lsEnv(edges)
     for (n in names) {
         toenv <- mkHash()
-        for (to in get(n, env = edges))
-            assign(to, TRUE, env = toenv)
-        assign(n, TRUE, env = toenv)
-        assign(n, toenv, env = reachable)
+        for (to in get(n, envir = edges))
+            assign(to, TRUE, envir = toenv)
+        assign(n, TRUE, envir = toenv)
+        assign(n, toenv, envir = reachable)
     }
     n <- length(names)
     k <- 1
@@ -322,14 +330,14 @@ findCycles <- function(reachable) {
     names <- lsEnv(reachable)
     cycles <- NULL
     for (n in names) {
-        if (exists(n, env = reachable, inherits = FALSE)) {
+        if (exists(n, envir = reachable, inherits = FALSE)) {
             v <- n
-            toenv <- get(n, env = reachable)
+            toenv <- get(n, envir = reachable)
             rm(list = n, envir = reachable)
             for (to in lsEnv(toenv)) {
-                if (exists(to, env = reachable, inherits = FALSE)) {
-                    backenv <- get(to, env = reachable)
-                    if (exists(n, env = backenv, inherits = FALSE)) {
+                if (exists(to, envir = reachable, inherits = FALSE)) {
+                    backenv <- get(to, envir = reachable)
+                    if (exists(n, envir = backenv, inherits = FALSE)) {
                         v <- c(v, to)
                         rm(list = to, envir = reachable)
                     }
@@ -373,8 +381,8 @@ compressLineRuns <- function(line) {
 # **** need update pre-computed stuff like node list, edge lists, etc
 # **** add more pre-computed stuff (cycle names, cycle map)
 addCycleInfo <- function(filename, rgp, map) {
-    inCycle <- function(name) exists(name, env = map, inherits = FALSE)
-    cycleName <- function(name) get(name, env = map, inherits = FALSE)
+    inCycle <- function(name) exists(name, envir = map, inherits = FALSE)
+    cycleName <- function(name) get(name, envir = map, inherits = FALSE)
     renameCycles <- function(line)
         unlist(lapply(line, function(n) if (inCycle(n)) cycleName(n) else n))
     # **** speed up by inlining loop and calls to 'exists', 'get'
@@ -383,8 +391,10 @@ addCycleInfo <- function(filename, rgp, map) {
         if (len > 0)
             for (i in 1 : len) {
                 n <- line[i]
-                if (.Internal(exists(n, map, "any", FALSE)))
-                    line[i] <- .Internal(get(n, map, "any", FALSE))
+                ## if (.Internal(exists(n, map, "any", FALSE)))
+                ##     line[i] <- .Internal(get(n, map, "any", FALSE))
+                if (exists(n, envir = map, inherits = FALSE))
+                    line[i] <- get(n, envir = map, inherits = FALSE)
             }
         line
     }
@@ -429,11 +439,11 @@ revProfCallGraphMap <- function(data) {
     for (from in lsEnv(data)) {
         entry <- getProfCallGraphNodeEntry(from, data)
         for (to in lsEnv(entry$edges)) {
-            if (exists(to, env = rg, inherits = FALSE))
-                edges <- get(to, env = rg)
+            if (exists(to, envir = rg, inherits = FALSE))
+                edges <- get(to, envir = rg)
             else edges <- character(0)
             if (! from %in% edges)
-                assign(to, c(from, edges), env = rg)
+                assign(to, c(from, edges), envir = rg)
         }
     }
     rg
@@ -447,19 +457,19 @@ flatProfile <- function(pd, byTotal = TRUE) {
     }
 
     if (byTotal) {
-        total <- sapply(nodes, function(n) get(n, env = pd$data)$total)
+        total <- sapply(nodes, function(n) get(n, envir = pd$data)$total)
         ord <- order(-total)
     }
     else {
-        self <- sapply(nodes, function(n) get(n, env = pd$data)$self)
+        self <- sapply(nodes, function(n) get(n, envir = pd$data)$self)
         ord <- order(-self)
     }
 
     nodes <- nodes[ord]
-    self <- sapply(nodes, function(n) get(n, env = pd$data)$self)
+    self <- sapply(nodes, function(n) get(n, envir = pd$data)$self)
     selftime <- self * pd$interval/1e+06
     selfpct <- 100 * self / pd$count
-    total <- sapply(nodes, function(n) get(n, env = pd$data)$total)
+    total <- sapply(nodes, function(n) get(n, envir = pd$data)$total)
     totaltime <- total * pd$interval/1e+06
     totalpct <- 100 * total / pd$count
     
@@ -585,17 +595,17 @@ printProfileCallGraph <- function(pd, file = stdout(), percent = TRUE) {
     if (is.null(pd$cycles))
         cnames <- character(0)
     else cnames <- unique(unlist(lapply(lsEnv(map), get, map)))
-    inCycle <- function(name) exists(name, env = map, inherits = FALSE)
-    cycleName <- function(name) get(name, env = map, inherits = FALSE)
+    inCycle <- function(name) exists(name, envir = map, inherits = FALSE)
+    cycleName <- function(name) get(name, envir = map, inherits = FALSE)
 
     nodes <- lsEnv(pd$data)
-    total <- sapply(nodes, function(n) get(n, env = pd$data)$total)
+    total <- sapply(nodes, function(n) get(n, envir = pd$data)$total)
     ord <- order(-total)
     nodes <- nodes[ord]
     total <- total[ord]
     totalpct <- 100 * total / pd$count
     totaltime <- total * pd$interval/1e+06
-    self <- sapply(nodes, function(n) get(n, env = pd$data)$self)
+    self <- sapply(nodes, function(n) get(n, envir = pd$data)$self)
     selfpct <- 100 * self / pd$count
     selftime <- self * pd$interval/1e+06
     pge <- profCallGraphEdges(pd)
@@ -619,8 +629,8 @@ printProfileCallGraph <- function(pd, file = stdout(), percent = TRUE) {
         cat("index    % time       self   children       name\n\n", file = con)
     for (i in seq(along = nodes)) {
         node <- nodes[i]
-        if (exists(node, env = rpge, inherits = FALSE))
-            for (n in get(node, env = rpge))
+        if (exists(node, envir = rpge, inherits = FALSE))
+            for (n in get(node, envir = rpge))
                 if (! n %in% cnames)
                     cat(makeCallerLine(n, node, pd), file = con)
         cat(makePrimaryLine(node, i, pd), file = con)
@@ -628,8 +638,8 @@ printProfileCallGraph <- function(pd, file = stdout(), percent = TRUE) {
             for (n in lsEnv(map))
                 if (cycleName(n) == node)
                     cat(makeCycleMemberLine(n, node, pd), file = con)
-        if (exists(node, env = pge, inherits = FALSE))
-            for (n in get(nodes[i], env = pge))
+        if (exists(node, envir = pge, inherits = FALSE))
+            for (n in get(nodes[i], envir = pge))
                 if (! n %in% cnames)
                     cat(makeCalleeLine(n, node, pd), file = con)
         cat("-----------------------------------------------\n", file = con)
@@ -653,7 +663,7 @@ extractProfileNodes <- function(pd, score = c("self", "total"),
     nodes <- lsEnv(pd$data)
     omitted <- getOmittedNodes(pd, mergeCycles)
     nodes <- nodes[! nodes %in% omitted]
-    getScore <- function(n) get(n, env = pd$data)[[score]]
+    getScore <- function(n) get(n, envir = pd$data)[[score]]
     sval <- unlist(lapply(nodes, getScore)) / pd$count
     list(nodes = nodes, scores = sval)
 }
@@ -667,15 +677,15 @@ extractProfileEdges <- function(pd, score = c("self", "total"),
     omitted <- getOmittedNodes(pd, mergeCycles)
     nodes <- nodes[! nodes %in% omitted]
     getToNodes <- function(n) {
-        to <- lsEnv(get(n, env = pd$data)$edges)
+        to <- lsEnv(get(n, envir = pd$data)$edges)
         to[! to %in% omitted]
     }
     edges <- lapply(nodes, getToNodes)
     getScores <- function(n) {
-        env <- get(n, env = pd$data)$edges
+        env <- get(n, envir = pd$data)$edges
         to <- lsEnv(env)
         to <- to[! to %in% omitted]
-        unlist(lapply(to, function(v) get(v, env = env)[[score]])) / pd$count
+        unlist(lapply(to, function(v) get(v, envir = env)[[score]])) / pd$count
     }
     sval <- lapply(nodes, getScores)
     list(edges = edges, scores = sval)
@@ -755,7 +765,7 @@ plotProfileCallGraph <- function(pd, layout = "dot",
         stop("package Rgraphviz is needed but not available")
 
     # **** eventually do an import here, or use Rgraphviz::plot
-    plot <- get("plot", env = .GlobalEnv)
+    plot <- get("plot", envir = .GlobalEnv)
 
     if (missing(score))
         score = "none"
