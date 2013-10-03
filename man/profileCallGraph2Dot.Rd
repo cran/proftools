@@ -6,11 +6,17 @@
    data produced by \code{Rprof}.
 }
 \usage{
-profileCallGraph2Dot(pd, score = c("total", "self"),
-                     transfer = function(x) x, colorMap = NULL,
-                     filename = "Rprof.dot", landscape = FALSE,
-                     mergeCycles = FALSE, edgesColored = TRUE,
-                     rankdir = "LR", center = FALSE, size)
+profileCallGraph2Dot(pd, score = c("none", "total", "self"),
+                     transfer = function(x) x, nodeColorMap = NULL,
+                     edgeColorMap = NULL, filename = "Rprof.dot",
+                     landscape = FALSE, mergeCycles = FALSE,
+                     edgesColored = FALSE,
+                     rankDir = c("TB", "LR"),
+                     nodeDetails = FALSE, edgeDetails = FALSE,
+                     nodeSizeScore = c("none", "total", "self"),
+                     edgeSizeScore = c("none", "total"),
+                     center = FALSE, size, shape = "ellipse",
+                     layout = "dot", style)
 }
 \arguments{
   \item{pd}{profile data as returned by \code{readProfileData}.}
@@ -19,24 +25,32 @@ profileCallGraph2Dot(pd, score = c("total", "self"),
                 missing. }
   \item{transfer}{ function; maps score values in unit interval to unit
                    interval }
-  \item{colorMap}{ character vector of color specifications as produced by
-                   \code{rainbow}; \code{transfer} of score is mapped to
-                   color }
+  \item{nodeColorMap,edgeColorMap}{ character vectors of color
+    specifications as produced by \code{rainbow}; \code{transfer} of
+    score is mapped to color }
   \item{filename}{ name of \code{.dot} file }
   \item{landscape}{ logical; whether to ad the \code{rotate=90} option to
                     the \code{.dot} file }
   \item{mergeCycles}{ logical; whether to merge each cycle of recursion into
                       a single node }
   \item{edgesColored}{ logical; whether to color edges }
-  \item{rankdir}{ character; value to use for the \code{rankdir=} option to
+  \item{rankDir}{ character; value to use for the \code{rankdir=} option to
                   specifythe direction that the plot is laid out using
                   the \code{dot} layout; must be either \code{"TB"} for
                   Top-to-Bottom or \code{"LR"} for Left-to-Right.  The
                   default value is \code{"LR"}.}
+  \item{nodeDetails,edgeDetails}{logical; whether count information
+    should be shown.}
+  \item{nodeSizeScore}{character; value to encode in the size of the nodes.}
+  \item{edgeSizeScore}{character; value to encode in the width of the edges.}
   \item{center}{ logical; whether to add the \code{center=1} option to
                  the \code{.dot} file. }
   \item{size}{ character; string to add as \code{size=} option in the
                \code{.dot} file. }
+  \item{shape}{ character; node shape.}
+  \item{layout}{ character; layout method to use.}
+  \item{style}{named list of values for arguments \code{score} through
+               \code{layout} to use if not explicitly supplied.}
 }
 \value{Used for side effect.}
 \details{
@@ -47,6 +61,9 @@ profileCallGraph2Dot(pd, score = c("total", "self"),
   see the \code{gprof} manual for further details.  The color encoding
   for a score \code{s} and a color map \code{m} is
   \code{ceiling(length(m) * transfer(s))}
+
+  A style can be specified to set options to a set of cvalues that work
+  well together.
 }
 \note{
   Because of lazy evaluation, nested calls like \code{f(g(x))}
@@ -68,34 +85,33 @@ profileCallGraph2Dot(pd, score = c("total", "self"),
   \code{\link{flatProfile}},
   \code{\link{plotProfileCallGraph}},
   \code{\link{printProfileCallGraph}}
+  \code{\link{plain.style}}
+  \code{\link{google.style}}
 }
 \examples{
+pd <- readProfileData(system.file("samples", "glmEx.out", package="proftools"))
+tmp <- tempfile()
+profileCallGraph2Dot(pd, filename = tmp)
+file.show(tmp)
+unlink(tmp)
+
 \dontrun{
-     ## Rprof() is not available on all platforms
-     Rprof(tmp <- tempfile())
-     example(glm)
-     Rprof()
-     profileCallGraph2Dot(readProfileData(tmp), filename = tmp)
-     file.show(tmp)
-     unlink(tmp)
+## If you have graphviz installed on a UNIX-like system
+## then in R do:
 
-     ## If you have graphviz installed on a UNIX-like system
-     ## then in R do:
+tmp.dot <- tempfile()
+tmp.pdf <- tempfile()
 
-     Rprof(tmp <- tempfile())
-     example(glm)
-     Rprof()
-     profileCallGraph2Dot(readProfileData(tmp), score = "total",
-                          filename = "foo.dot")
+profileCallGraph2Dot(pd, filename = tmp.dot)
+system(sprintf("dot -Tpdf -o%s %s", tmp.pdf, tmp.dot))
+browseURL(sprintf("file://%s", tmp.pdf))
 
-     ## and then in a shell do (to use the interactive dotty):
+profileCallGraph2Dot(pd, score = "total", filename = tmp.dot)
+system(sprintf("dot -Tpdf -o%s %s", tmp.pdf, tmp.dot))
+browseURL(sprintf("file://%s", tmp.pdf))
 
-     dotty foo.dot
-
-     ## or (to create a postscript version and view with gv)
-
-     dot -Tps foo.dot > foo.ps
-     gv foo.ps
+unlink(tmp.dot)
+unlink(tmp.pdf)
   }
 }
 \keyword{programming}
