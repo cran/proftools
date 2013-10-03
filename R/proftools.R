@@ -1,30 +1,45 @@
 .EmptyEnv <- if (exists("emptyenv")) emptyenv() else NULL
 mkHash <- function() new.env(hash = TRUE, parent = .EmptyEnv)
 
-n2d <- function(name, color = NULL) {
+n2d <- function(name, color = NULL, fontSize = 14, shape = "ellipse") {
     if (is.null(color) || is.na(color))
-        paste("\"", name, "\";\n", sep = "")
+        paste("\"", name, "\"[shape=", shape, ",fontsize=",
+              fontSize,"];\n", sep = "")
     else
-        paste("\"", name, "\"[style=filled,color=\"", color, "\"];\n",
-              sep = "")
+        ## If you don't specify fillcolor, graphviz defaults both background &
+        ## border to color. Original dot graph only specified color, which I 
+        ## believe is the reason you made the dot file colors range from light 
+        ## blue to red (to prevent borders from disappearing).
+        ## See http://stackoverflow.com/questions/9106079/graphviz-how-to-change-border-color
+        paste("\"", name, "\"[shape=", shape,
+              ",style=filled,color=black,fillcolor=\"",
+              color, "\"fontsize=", fontSize, "];\n", sep = "")
 }
 
-e2d <- function(from, to, color = NULL) {
+e2d <- function(from, to, color = NULL, edgeLabel="", edgeWidth = 1) {
     e <- paste("\"", from, "\" -> \"", to, "\"", sep = "")
     if (is.null(color))
-        paste(e, ";\n", sep = "")
+        paste(e, "[label=\"", edgeLabel, "\", penwidth=", edgeWidth, "];\n",
+              sep = "")
     else
-        paste(e, "[color=\"", color, "\"];\n", sep = "")
+        paste(e, "[color=\"", color, "\", label=\"", edgeLabel,"\", penwidth=",
+              edgeWidth, "];\n", sep = "")
 }
 
 # **** A plausible size is 10,7.5
 g2d <- function(g, filename = "g.dot", landscape = TRUE,
-                nodeColors = NULL, edgeColors = NULL,
-                size, center = FALSE, rankdir = c("TB","LR")) {
-    if (missing(rankdir))
-        rankdir = "LR"
-    else match.arg(rankdir)
+                nodeColors = NULL, nodeDetails = TRUE,
+                edgeColors = NULL, edgeDetails = TRUE,
+                size, center = FALSE, rankdir = c("TB","LR"),
+                score = NULL, shape = "ellipse",
+                nodeSizeScore = c("none", "total", "self"),
+                edgeSizeScore = c("none", "total")) {
+    rankdir <- match.arg(rankdir)
+    nodeSizeScore <- match.arg(nodeSizeScore)
+    edgeSizeScore <- match.arg(edgeSizeScore)
 
+    eL <- g$edgeL
+    
     con <- file(filename, open = "w")
     on.exit(close(con))
 
@@ -36,26 +51,59 @@ g2d <- function(g, filename = "g.dot", landscape = TRUE,
     if (center)
         cat("center=1;\n", file = con)
     cat(paste("rankdir=", rankdir, ";\n", sep = ""), file = con)
-    for (i in seq(along = g$nodes)) {
-        from <- g$nodes[i]
-        cat(n2d(from, nodeColors[[i]]), file = con)
-        toList <- g$edges[[i]]
+
+    ## The quadruple backslashes needed for dot file
+    g$gNodes <- gsub("\n", '\\\\n', g$gNodes)
+    edgeCounts <- g$callCounts
+    if (edgeSizeScore != "none")
+        edgeWidths <- lapply(edgeCounts, function(x) round(log10(x+10)))
+    else
+        edgeWidths <- lapply(edgeCounts, function(x) rep(1, length(x)))
+    if (edgeDetails)
+        edgeCounts <- lapply(edgeCounts, function(x) paste(" ", x))
+    else
+        edgeCounts <- lapply(edgeCounts, function(x) rep("", length(x)))
+    ## This assigns the sizes of fonts, which determines the sizes of nodes
+    if (nodeDetails)
+        labels <- g$gNodes
+    else
+        labels <- g$nodes
+    if (nodeSizeScore != "none") {
+        if (nodeSizeScore == "total") val <- g$totalPercent
+        else val <- g$selfPercent
+        fontSizes <- pmax(7, sqrt(val) * 4) * 2
+    }
+    else
+        fontSizes <- rep(14, length(labels))
+
+    for (i in seq(along = labels)) {
+        from <- labels[i]
+        cat(n2d(from, nodeColors[[i]], fontSizes[i], shape), file = con)
+        ## Have to use eL to know toList because g$edges contains plain
+        ## node names
+        toList <- labels[eL[[i]]$edges]
         toColors <- edgeColors[[i]]
         for (j in seq(along = toList))
-            cat(e2d(from, toList[[j]], toColors[[j]]), file = con)
+            cat(e2d(from, toList[[j]], toColors[[j]], edgeCounts[[i]][j],
+                    edgeWidths[[i]][j]), file = con)
     }
+
     cat("}", file = con)
 }
 
-g2g <- function(g) {
-    if (! require("graph"))
-        stop("package graph is needed but not available")
-    # **** eventually maybe do new("graph::graphNEL") here
-    nodes <- g$nodes
-    mke <- function(e) list(edges = match(e, nodes))
-    eL <- lapply(g$edges, mke)
-    names(eL) <- nodes
-    new("graphNEL", nodes = nodes, edgeL = eL, edgemode = "directed")
+g2g <- function(g, nodeDetails) {
+    eL <- g$edgeL
+
+    if (nodeDetails) {
+        names(eL) <- g$gNodes
+        nodes <- g$gNodes
+    }
+    else {
+        nodes <- g$nodes
+        names(eL) <- nodes
+    }
+
+    graph::graphNEL(nodes = nodes, edgeL = eL, edgemode = "directed")
 }
 doProfileLines <- function (fun, filename = "Rprof.out", chunksize = 5000) {
     rprof <- file(filename)
@@ -98,25 +146,26 @@ makeProfCallGraphData <- function() mkHash()
 getProfCallGraphNodeEntry <- function(name, env)
     get(name, envir = env)
 
-incProfCallGraphNodeEntry <- function(name, what, env) {
+incProfCallGraphNodeEntry <- function(name, what, env, count = 1) {
     if (exists(name, envir = env, inherits = FALSE))
         entry <- get(name, envir = env)
-    else 
+    else
         entry <- list(self = 0, total = 0, edges = mkHash())
-    entry[[what]] <- entry[[what]] + 1
-    assign(name, entry, envir = env)    
+    entry[[what]] <- entry[[what]] + count
+    assign(name, entry, envir = env)
 }
+
 getProfCallGraphEdgeEntry <- function(from, to, env) {
     fromEntry <- getProfCallGraphNodeEntry(from, env)
     get(to, envir = fromEntry$edges)
 }
 
-incProfCallGraphEdgeEntry <- function(from, to, what, env) {
+incProfCallGraphEdgeEntry <- function(from, to, what, env, count = 1) {
     fromEntry <- getProfCallGraphNodeEntry(from, env)
     if (exists(to, envir = fromEntry$edges, inherits = FALSE))
         entry <- get(to, envir = fromEntry$edges)
     else entry <- list(self = 0, total = 0)
-    entry[[what]] <- entry[[what]] + 1
+    entry[[what]] <- entry[[what]] + count
     assign(to, entry, envir = fromEntry$edges)
 }
 # **** For long Rprof output files this and addCycleInfo are the bottle necks.
@@ -124,24 +173,26 @@ incProfCallGraphEdgeEntry <- function(from, to, what, env) {
 # **** need to pre-compute stuff like node list, edge lists, etc
 rawProfCallGraph <- function(filename = "Rprof.out", chunksize = 5000) {
     data <- makeProfCallGraphData()
-    fun <- function(line) {
-        incProfCallGraphNodeEntry(line[1], "self", data)
+    fun <- function(line, count = 1) {
+        incProfCallGraphNodeEntry(line[1], "self", data, count)
         for (n in unique(line))
-            incProfCallGraphNodeEntry(n, "total", data)
+            incProfCallGraphNodeEntry(n, "total", data, count)
         if (length(line) > 1) {
-            incProfCallGraphEdgeEntry(line[2], line[1], "self", data)
+            incProfCallGraphEdgeEntry(line[2], line[1], "self",
+                                      data, count)
             le <- lineEdges(line)
             for (i in seq(along = le$nodes)) {
                 from <- le$nodes[i]
                 for (to in le$edges[[i]])
-                    incProfCallGraphEdgeEntry(from, to, "total", data)
+                    incProfCallGraphEdgeEntry(from, to, "total",
+                                              data, count)
             }
-      
-        }    
+        }
     }
     val <- doProfileLines(fun, filename, chunksize)
     list(interval = val$interval, count = val$count, data = data)
 }
+
 charMatch <- function(x, table, nomatch = NA)
     match(x, table, nomatch)
 
@@ -160,6 +211,7 @@ lineEdges <- function(line) {
         list(nodes = from, edges = edges)
     }
 }
+
 lsEnv <- function(env)
     ls(env, all.names = TRUE)
 
@@ -171,6 +223,7 @@ profCallGraphEdges <- function(data) {
     }
     edges
 }
+
 makeCycleMap <- function(cycles) {
     cycleMap <- mkHash()
     for (i in seq(along = cycles))
@@ -178,6 +231,7 @@ makeCycleMap <- function(cycles) {
             assign(n, paste("<cycle ", i, ">", sep = ""), envir = cycleMap)
     cycleMap
 }
+
 ## New findCycles
 ## Uses an incidence matrix and matrix multiplication.
 ## Could use a sparse representation but proably not worth the trouble.
@@ -225,12 +279,14 @@ findMatCycles <- function(m) {
     cycles
 }
 
-findCycles <- function(edges) {
+findCycles <- function(data) {
+    edges <- profCallGraphEdges(data)
     funs <- edges2funs(edges)
     m1 <- edges2mat(funs, edges)
     mr <- findReachableMat(m1)
     lapply(findMatCycles(mr), function(v) funs[v])
 }
+
 compressLineRuns <- function(line) {
     if (length(line) > 1) {
         keep <- rep(TRUE, length(line))
@@ -269,22 +325,24 @@ addCycleInfo <- function(filename, data, cycles) {
         line
     }
     cnames <- unique(unlist(lapply(lsEnv(map), get, map)))
-    fun <- function(line) {
+    fun <- function(line, count = 1) {
         line <- compressLineRuns(renameCycles(line))
         if (isIn(line[1], cnames))
-            incProfCallGraphNodeEntry(line[1], "self", data)
+            incProfCallGraphNodeEntry(line[1], "self", data, count)
         for (n in unique(line))
             if (isIn(n, cnames))
-                incProfCallGraphNodeEntry(n, "total", data)
+                incProfCallGraphNodeEntry(n, "total", data, count)
         if (length(line) > 1) {
             if (isIn(line[1], cnames) || isIn(line[1], cnames))
-                incProfCallGraphEdgeEntry(line[2], line[1], "self", data)
+                incProfCallGraphEdgeEntry(line[2], line[1], "self",
+                                          data, count)
             le <- lineEdges(line)
             for (i in seq(along = le$nodes)) {
                 from <- le$nodes[i]
                 for (to in le$edges[[i]])
                     if (isIn(from, cnames) || isIn(to, cnames))
-                        incProfCallGraphEdgeEntry(from, to, "total", data)
+                        incProfCallGraphEdgeEntry(from, to, "total",
+                                                  data, count)
             }
         }
     }
@@ -295,7 +353,7 @@ addCycleInfo <- function(filename, data, cycles) {
 # **** use some sort of class to make opaque printed representation?
 readProfileData <- function(filename = "Rprof.out") {
     rpg <- rawProfCallGraph(filename)
-    cycles <- findCycles(profCallGraphEdges(rpg$data))
+    cycles <- findCycles(rpg$data)
     if (! is.null(cycles))
         addCycleInfo(filename, rpg$data, cycles)
     rpg$cycles <- cycles
@@ -316,6 +374,7 @@ revProfCallGraphMap <- function(data) {
     }
     rg
 }
+
 flatProfile <- function(pd, byTotal = TRUE) {
     nodes <- lsEnv(pd$data)
     if (! is.null(pd$cycles)) {
@@ -352,12 +411,13 @@ flatProfile <- function(pd, byTotal = TRUE) {
         val <- cbind(round(selfpct, 2), round(cumselftime, 2),
                      round(selftime, 2), round(totalpct, 2),
                      round(totaltime, 2))
-        colnames(val) <- c("self.pct", "cum.self.time", "self.time", 
+        colnames(val) <- c("self.pct", "cum.self.time", "self.time",
                            "total.pct", "total.time")
     }
     rownames(val) <- nodes
     val
 }
+
 makePrimaryLine<- function(node, i, pg) {
     idx <- sprintf("%-6s", paste("[", i, "]", sep = ""))
     if (pg$percent) {
@@ -451,12 +511,12 @@ makeCycleMemberLine <- function(n, cycle, pg) {
 # **** a lot of the stuff computed here should be pre-computad and part of pd
 printProfileCallGraph <- function(pd, file = stdout(), percent = TRUE) {
     if (is.character(file)) {
-        if (file == "") 
+        if (file == "")
             stop("'file' must be non-empty string")
         con <- file(file, "wb")
         on.exit(close(con))
     }
-    else if (inherits(file, "connection")) 
+    else if (inherits(file, "connection"))
         con <- file
     else stop("bad file argument")
 
@@ -514,6 +574,7 @@ printProfileCallGraph <- function(pd, file = stdout(), percent = TRUE) {
         cat("-----------------------------------------------\n", file = con)
     }
 }
+
 getOmittedNodes <- function(pd, mergeCycles) {
     map <- makeCycleMap(pd$cycles)
     cnodes <- lsEnv(map)
@@ -524,22 +585,28 @@ getOmittedNodes <- function(pd, mergeCycles) {
     else unique(unlist(lapply(cnodes, get, map)))
 }
 
-extractProfileNodes <- function(pd, score = c("self", "total"),
+extractProfileNodes <- function(pd, score = c("self", "total", "none"),
                                 mergeCycles = TRUE) {
-    if (missing(score))
+    if (score == "none")
         score <- "total"
     else match.arg(score)
     nodes <- lsEnv(pd$data)
     omitted <- getOmittedNodes(pd, mergeCycles)
     nodes <- nodes[! nodes %in% omitted]
-    getScore <- function(n) get(n, envir = pd$data)[[score]]
-    sval <- unlist(lapply(nodes, getScore)) / pd$count
-    list(nodes = nodes, scores = sval)
+    getScore <- function(n, type) get(n, envir = pd$data)[[type]]
+    ## totalCost & selfCost needed for Google-style node Labels
+    totalCost <- unlist(lapply(nodes, getScore, "total"))
+    selfCost <- unlist(lapply(nodes, getScore, "self"))
+    if(score == "total")
+        sval <- totalCost / pd$count
+    else sval <- selfCost / pd$count
+    list(nodes = nodes, scores = sval,
+         totalCost = totalCost, selfCost = selfCost)
 }
 
-extractProfileEdges <- function(pd, score = c("self", "total"),
+extractProfileEdges <- function(pd, score = c("self", "total", "none"),
                                 mergeCycles = TRUE) {
-    if (missing(score))
+    if (score == "none")
         score <- "total"
     else match.arg(score)
     nodes <- lsEnv(pd$data)
@@ -550,44 +617,63 @@ extractProfileEdges <- function(pd, score = c("self", "total"),
         to[! to %in% omitted]
     }
     edges <- lapply(nodes, getToNodes)
-    getScores <- function(n) {
+    ## getScores no longer divides by pd$count so can we avoid calling it 
+    ## twice (if possible) to get callCounts below
+    getScores <- function(n, type) {
         env <- get(n, envir = pd$data)$edges
         to <- lsEnv(env)
         to <- to[! to %in% omitted]
-        unlist(lapply(to, function(v) get(v, envir = env)[[score]])) / pd$count
+        unlist(lapply(to, function(v) get(v, envir = env)[[type]]))
     }
-    sval <- lapply(nodes, getScores)
-    list(edges = edges, scores = sval)
+    sval <- lapply(nodes, getScores, score)
+    if (score == "total") callCounts <- sval
+    else callCounts <- lapply(nodes, getScores, "total")
+    list(edges = edges, scores = sval, callCounts = callCounts)
 }
 
 # **** option to suppress some nodes
 # **** make edgesColored = FALSE by default?
 np2x <- function(pd, score = c("total", "self", "none"),
-                 transfer = function(x) x, colorMap = NULL,
-                 mergeCycles = FALSE, edgesColored = TRUE) {
+                 transfer = function(x) x, nodeColorMap = NULL,
+                 edgeColorMap = NULL, mergeCycles = FALSE,
+                 edgesColored = FALSE) {
     match.arg(score)
-    if (score == "none") {
+    nodes <- extractProfileNodes(pd, score, mergeCycles = mergeCycles)
+    edges <- extractProfileEdges(pd, score, mergeCycles = mergeCycles)
+    totalPercent <- round(nodes$totalCost*100/pd$count, 2)
+    selfPercent <- round(nodes$selfCost*100/pd$count, 2)
+    gNodes <- paste(nodes$nodes, "\n", nodes$selfCost, " (", selfPercent, 
+                    "%) \n of ", nodes$totalCost, " (", totalPercent, "%)", 
+                    sep="")
+    p <- list(nodes = nodes$nodes, edges = edges$edges, 
+              callCounts = edges$callCounts, gNodes = gNodes, 
+              totalPercent = totalPercent, selfPercent = selfPercent)
+    if (score == "none")
         color <- ecolor <- NULL
-        nodes <- extractProfileNodes(pd, mergeCycles = mergeCycles)
-        edges <- extractProfileEdges(pd, mergeCycles = mergeCycles)
-        p <- list(nodes = nodes$nodes, edges = edges$edges)
-    }
     else {
-        nodes <- extractProfileNodes(pd, score, mergeCycles = mergeCycles)
-        edges <- extractProfileEdges(pd, score, mergeCycles = mergeCycles)
-        p <- list(nodes = nodes$nodes, edges = edges$edges)
-        color <- lapply(transfer(nodes$scores), colorScore, colorMap)
+        ## Scale by maxScore to always create a red node
+        maxScore <- max(nodes$scores)
+        nodes$scores <- nodes$scores/maxScore
+        color <- lapply(transfer(nodes$scores), colorScore, nodeColorMap)
         if (edgesColored) {
             ecolor <- vector("list", length(p$nodes))
             for (i in seq(along = ecolor)) {
-                escore <- transfer(edges$scores[[i]])
-                ecolor[[i]] <- lapply(escore, colorScore, colorMap)
+                ## edges$scores is actually counts (see extractProfileEdges),
+                ## divide by total count to convert to scores 
+                ## and scale by maxScore to always create a red edge
+                escore <- transfer(edges$scores[[i]] / pd$count)
+                escore <- escore/maxScore
+                ecolor[[i]] <- lapply(escore, colorScore, edgeColorMap)
             }
         }
         else ecolor <- NULL
     }
     p$nodeColors <- color
     p$edgeColors <- ecolor
+
+    mke <- function(e) list(edges = match(e, p$nodes))
+    p$edgeL <- lapply(p$edges, mke)
+
     p
 }
 
@@ -612,61 +698,160 @@ colorScore <- function(score, colorMap) {
     }
 }
 
-profileCallGraph2Dot <- function(pd, score = c("total", "self"),
-                                 transfer = function(x) x, colorMap = NULL,
-                                 filename = "Rprof.dot", landscape = FALSE,
-                                 mergeCycles = FALSE, edgesColored = TRUE,
-                                 rankdir = "LR", center = FALSE, size) {
-    if (missing(score))
-        score = "none"
-    else match.arg(score)
-    p <- np2x(pd, score, transfer, colorMap, mergeCycles, edgesColored)
+profileCallGraph2Dot <- function(pd, score = c("none", "total", "self"),
+                                 transfer = function(x) x, nodeColorMap = NULL,
+                                 edgeColorMap = NULL, filename = "Rprof.dot",
+                                 landscape = FALSE, mergeCycles = FALSE,
+                                 edgesColored = FALSE,
+                                 rankDir = c("TB", "LR"),
+                                 nodeDetails = FALSE, edgeDetails = FALSE,
+                                 nodeSizeScore = c("none", "total", "self"),
+                                 edgeSizeScore = c("none", "total"),
+                                 center = FALSE, size, shape = "ellipse",
+                                 layout = "dot", style) {
+    if (! missing(style)) {
+        if (missing(layout)) layout <- style$layout
+        if (missing(score)) score <- style$score
+        if (missing(transfer)) transfer <- style$transfer
+        if (missing(nodeColorMap)) nodeColorMap <- style$nodeColorMap
+        if (missing(edgeColorMap)) edgeColorMap <- style$edgeColorMap
+        if (missing(mergeCycles)) mergeCycles <- style$mergeCycles
+        if (missing(edgesColored)) edgesColored <- style$edgesColored
+        if (missing(rankDir)) rankDir <- style$rankDir
+        if (missing(nodeDetails)) nodeDetails <- style$nodeDetails
+        if (missing(edgeDetails)) edgeDetails <- style$edgeDetails
+        if (missing(nodeSizeScore)) nodeSizeScore <- style$nodeSizeScore
+        if (missing(edgeSizeScore)) edgeSizeScore <- style$edgeSizeScore
+        if (missing(shape)) shape <- style$shape
+    }
+    score <- match.arg(score)
+    rankDir <- match.arg(rankDir)
+    nodeSizeScore <- match.arg(nodeSizeScore)
+    edgeSizeScore <- match.arg(edgeSizeScore)
+
+    if (score != "none") {
+        if (is.null(nodeColorMap))
+            nodeColorMap <- heat.colors(100)
+        if (is.null(edgeColorMap))
+            edgeColorMap <- hsv(1,1,seq(1,0,length.out=50))
+    }
+
+    p <- np2x(pd, score, transfer, nodeColorMap, edgeColorMap, mergeCycles,
+              edgesColored)
     g2d(p, filename, nodeColors = p$nodeColors, edgeColors = p$edgeColors,
-        landscape = landscape, rankdir = rankdir, size = size, center = center)
+        landscape = landscape, rankdir = rankDir, size = size, center = center,
+        score = score, nodeDetails = nodeDetails, edgeDetails = edgeDetails,
+        shape = shape, nodeSizeScore = nodeSizeScore,
+        edgeSizeScore = edgeSizeScore)
 }
 
-plotProfileCallGraph <- function(pd, layout = "dot", 
-                                 score = c("total", "self"),
-                                 transfer = function(x) x, colorMap = NULL,
-                                 mergeCycles = FALSE, edgesColored = TRUE,
-                                 rankDir = "LR", ...) {
-    if (! require(Rgraphviz))
-        stop("package Rgraphviz is needed but not available")
+plotProfileCallGraph <- function(pd, layout = "dot",
+                                 score = c("none", "total", "self"),
+                                 transfer = function(x) x, nodeColorMap = NULL,
+                                 edgeColorMap = NULL, mergeCycles = FALSE,
+                                 edgesColored = FALSE, rankDir = c("TB", "LR"),
+                                 nodeDetails = FALSE, edgeDetails = FALSE,
+                                 nodeSizeScore = c("none", "total", "self"),
+                                 edgeSizeScore = c("none", "total"),
+                                 shape = "ellipse", style, ...) {
+    if (! missing(style)) {
+        if (missing(layout)) layout <- style$layout
+        if (missing(score)) score <- style$score
+        if (missing(transfer)) transfer <- style$transfer
+        if (missing(nodeColorMap)) nodeColorMap <- style$nodeColorMap
+        if (missing(edgeColorMap)) edgeColorMap <- style$edgeColorMap
+        if (missing(mergeCycles)) mergeCycles <- style$mergeCycles
+        if (missing(edgesColored)) edgesColored <- style$edgesColored
+        if (missing(rankDir)) rankDir <- style$rankDir
+        if (missing(nodeDetails)) nodeDetails <- style$nodeDetails
+        if (missing(edgeDetails)) edgeDetails <- style$edgeDetails
+        if (missing(nodeSizeScore)) nodeSizeScore <- style$nodeSizeScore
+        if (missing(edgeSizeScore)) edgeSizeScore <- style$edgeSizeScore
+        if (missing(shape)) shape <- style$shape
+    }
+    score <- match.arg(score)
+    rankDir <- match.arg(rankDir)
+    nodeSizeScore <- match.arg(nodeSizeScore)
+    edgeSizeScore <- match.arg(edgeSizeScore)
 
-    # **** eventually do an import here, or use Rgraphviz::plot
-    plot <- get("plot", envir = .GlobalEnv)
+    if (score != "none") {
+        if (is.null(nodeColorMap))
+            nodeColorMap <- heat.colors(100)
+        if (is.null(edgeColorMap))
+            edgeColorMap <- hsv(1,1,seq(1,0,length.out=50))
+    }
 
-    if (missing(score))
-        score = "none"
-    else match.arg(score)
-    if (score != "none" && is.null(colorMap))
-        colorMap <- heat.colors(100)
+    p <- np2x(pd, score, transfer, nodeColorMap,
+              edgeColorMap, mergeCycles, edgesColored)
 
-    p <- np2x(pd, score, transfer, colorMap, mergeCycles, edgesColored)
-
+    g <- g2g(p, nodeDetails)
+    names(labels) <- labels <- graph::nodes(g)
     if (! is.null(p$nodeColors)) {
         p$nodeColors <- unlist(p$nodeColors)
-        names(p$nodeColors) <- p$nodes
+        names(p$nodeColors) <- labels
     }
-
+    ## Create the edgeNames list based on the edgeL(g) which only has
+    ## numbers matching the from and to.
+    edges <- graph::edgeL(g); edgeNames <- list()
+    for (i in seq(along = edges))
+        if(length(edges[[i]]$edges)>0)
+            edgeNames[[i]] <- paste(labels[i], labels[edges[[i]]$edges],
+                                    sep="~")
+    edgeNames <- unlist(edgeNames)
     if (! is.null(p$edgeColors)) {
-        for (i in seq(along = p$edgeColors))
-            if (length(p$edges[[i]]) > 0)
-                names(p$edgeColors[[i]]) <- paste(p$nodes[i], p$edges[[i]],
-                                                  sep="~")
         p$edgeColors <- unlist(p$edgeColors)
+        names(p$edgeColors) <- edgeNames
     }
 
-    attrs <- list(node = list(shape = "ellipse"))
+    if (nodeSizeScore != "none") {
+        ## This uses the same font size calculation as the dot file
+        ## version
+        if (nodeSizeScore == "total") val <- p$totalPercent
+        else val <- p$selfPercent
+        fontSizes <- pmax(7, sqrt(val) * 4) * 2
+        names(fontSizes) <- labels
+        graph::nodeRenderInfo(g) <- list(label = labels, fontsize = fontSizes)
+    }
+
+    edgeCounts <- unlist(p$callCounts)
+    if (edgeSizeScore != "none") {
+        edgeWeights <- log10(edgeCounts+10)
+        names(edgeWeights) <- edgeNames
+        graph::edgeRenderInfo(g) <- list(lwd = edgeWeights)
+    }
+
+    if (edgeDetails) {
+        spacing <- sapply(edgeCounts, function(x){rep("   ", length(x))})
+        edgeCounts <- paste(spacing, edgeCounts, sep="")
+        names(edgeCounts) <- edgeNames
+        graph::edgeRenderInfo(g) <- list(label = edgeCounts, fontsize = 8)
+    }
+
+    ## The order of layout and rendering info calls below
+    ## matters. Certain attributes don't work well if we change the
+    ## order.  See
+    ## https://stat.ethz.ch/pipermail/bioconductor/2012-November/049253.html
+    attrs <- list(node = list(shape = shape, fixedsize = FALSE))
     if (layout == "dot")
         attrs$graph <- list(rankdir = rankDir)
-    if (score == "none")
-        nodeAttrs <- NULL
-    else nodeAttrs <- list(fillcolor = p$nodeColors)
-    if (score == "none" || ! edgesColored)
-        edgeAttrs <- NULL
-    else edgeAttrs <- list(color = p$edgeColors)
-
-    plot(g2g(p), layout, attrs = attrs,
-         nodeAttrs = nodeAttrs, edgeAttrs = edgeAttrs, ...)
+    g <- Rgraphviz::layoutGraph(g, layoutType = layout, attrs = attrs)
+    graph::edgeRenderInfo(g) <- list(col = p$edgeColors)
+    graph::nodeRenderInfo(g) <- list(fill = p$nodeColors)
+    Rgraphviz::renderGraph(g, ...)
 }
+
+plain.style <- list(layout = "dot", score = "none",
+                    transfer = function(x) x, nodeColorMap = NULL,
+                    edgeColorMap = NULL, mergeCycles = FALSE,
+                    edgesColored = FALSE, rankDir = "TB",
+                    nodeDetails = FALSE, edgeDetails = FALSE,
+                    nodeSizeScore = "none", edgeSizeScore = "none",
+                    shape = "ellipse")
+
+google.style <- list(layout = "dot", score = "none",
+                     transfer = function(x) x, nodeColorMap = NULL,
+                     edgeColorMap = NULL, mergeCycles = FALSE,
+                     edgesColored = FALSE, rankDir = "TB",
+                     nodeDetails = TRUE, edgeDetails = TRUE,
+                     nodeSizeScore = "self", edgeSizeScore = "total",
+                     shape = "box")

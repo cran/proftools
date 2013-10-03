@@ -29,16 +29,9 @@ readProfileData(filename = "Rprof.out")
   \code{\link{profileCallGraph2Dot}}
 }
 \examples{
-\dontrun{
-     ## Rprof() is not available on all platforms
-     Rprof(tmp <- tempfile())
-     example(glm)
-     Rprof()
-     flatProfile(readProfileData(tmp))
-     flatProfile(readProfileData(tmp), FALSE)
-     unlink(tmp)
-  }
+pd <- readProfileData(system.file("samples", "glmEx.out", package="proftools"))
+flatProfile(pd)
+flatProfile(pd, FALSE)
 }
 \keyword{programming}
 \keyword{utilities}
-

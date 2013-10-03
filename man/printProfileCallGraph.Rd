@@ -51,30 +51,23 @@ printProfileCallGraph(pd, file = stdout(), percent = TRUE)
   \code{\link{profileCallGraph2Dot}}
 }
 \examples{
+pd <- readProfileData(system.file("samples", "glmEx.out", package="proftools"))
+printProfileCallGraph(pd)
 \dontrun{
-     ## Rprof() is not available on all platforms
-     Rprof(tmp <- tempfile())
-     example(glm)
-     Rprof()
-     printProfileCallGraph(readProfileData(tmp))
-     unlink(tmp)
+## If you have graphviz and cgprof installed on a UNIX-like system
+## then in R do:
 
-     ## If you have graphviz and cgprof installed on a UNIX-like system
-     ## then in R do:
+pd <- readProfileData(system.file("samples", "glmEx.out", package="proftools"))
+printProfileCallGraph(pd, "foo.graph")
 
-     Rprof(tmp <- tempfile())
-     example(glm)
-     Rprof()
-     printProfileCallGraph(readProfileData(tmp), "foo.graph")
+## and then in a shell do (to use the interactive dotty):
 
-     ## and then in a shell do (to use the interactive dotty):
+cgprof -TX foo.graph
 
-     cgprof -TX foo.graph
+## or (to create a postscript version and view with gv):
 
-     ## or (to create a postscript version and view with gv):
-
-     cgprof -Tps foo.graph > foo.ps
-     gv foo.ps
+cgprof -Tps foo.graph > foo.ps
+gv foo.ps
   }
 }
 \keyword{programming}

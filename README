@@ -46,6 +46,17 @@ The package exports five functions:
         install these packages to use this function.
 
 
+EXPORTED VARIABLES
+
+The package also exports two variables:
+
+    plain.style
+    google.style
+
+These are style specifications to be used with the call graph display
+functions plotProfileCallGraph and profileCallGraph2Dot.
+
+
 A SIMPLE EXAMPLE
 
 Collect profile information  for the examples for glm:
@@ -82,7 +93,7 @@ to display the graph in the interactive graph viewer dotty, or use
 to create a PostScript version of the call graph and display it with
 gv.
 
-Instead of using the printed graph and cgprof you can use create a
+Instead of using the printed graph and cgprof you can create a
 Graphviz .dot file representation of the call graph with
 
           profileCallGraph2Dot(pd, filename = "glm.dot", score = "total")
@@ -96,13 +107,21 @@ or as a postscript file with
           dot -Tps glm.dot > glm.ps
           gv glm.ps
 
-Finally, if you have the graph package from CRAN and the Rgraphviz
-package from Bioconductor installed, then you can view the call graph
-within R using
+Finally, if you have the packages graph and Rgraphviz from
+Bioconductor installed, then you can view the call graph within R
+using
 
           plotProfileCallGraph(pd, score = "total")
 
-The default settings for this version need some work.]
+Both plotProfileCallGraph and profileCallGraph2Dot accept many
+parameters for adjusting features of the display. You can specify
+these parameters individually or with a single style parameter.
+For example,
+
+          plotProfileCallGraph(pd, style = google.style)
+
+displayes the call graph in a style similar to the one used by the
+pprof tool in the Google Performance Tools suite.
 
 
 OPEN ISSUES
@@ -120,21 +139,3 @@ interpretation, but at the cost of lumping all cycle members together.
 
 gprof provides options for pruning graph printouts by omitting
 specified nodes.  It may be useful to allow this here as well.
-
-Probably more use should be made of the graph package.
-
-
-IMPLEMENTATION NOTES
-
-The implementation is extremely crude (a real mess would be more
-accurate) and will hopefully be improved over time--at this point it
-is more of an existence proof than a final product.
-
-Performance is less than ideal, though using these tools it was
-possible to identify some problem points and speed up computing the
-profile data by a factor of two (in other words, it may be bad now but
-it used to be worse).  More careful design of the data structures and
-memoizing calculations that are now repeated is likely to improve
-performance substantially.
-
-
