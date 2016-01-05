@@ -6,7 +6,8 @@
   by \code{Rprof}.  Output can be directed to a connection or a file.
 }
 \usage{
-printProfileCallGraph(pd, file = stdout(), percent = TRUE)
+printProfileCallGraph(pd, file = stdout(), percent = TRUE, GC = TRUE,
+                      maxnodes = NA, total.pct = 0)
 }
 \arguments{
   \item{pd}{profile data as returned by \code{readProfileData}.}
@@ -14,6 +15,11 @@ printProfileCallGraph(pd, file = stdout(), percent = TRUE)
                graph will be written. }
   \item{percent}{ logical; if true use percent of total time; otherwise
                   use time in seconds }
+  \item{GC}{logical; include GC information or not.}
+  \item{maxnodes}{integer; maximal number of nodes to use; nodes with
+                  lower total hit counts are dropped.}
+  \item{total.pct}{numeric; if positive, nodes with hit percentages
+    below this level are dropped.}	      
 }
 \value{Used for side effect.}
 \details{
@@ -21,7 +27,7 @@ printProfileCallGraph(pd, file = stdout(), percent = TRUE)
   \code{printProfileCallGraph} produces a printed representation of
   the call graph for profile data produced by \code{Rprof}.  The
   representation is analogous to the call graph produced by
-  \code{gprof} with a few minor changes.  eventually more complete
+  \code{gprof} with a few minor changes.  Eventually more complete
   documentation of the format will be provided here; for now, reading
   the \code{gprof} manual section on the call graph should help
   understanding this output.  The output is similar enough to

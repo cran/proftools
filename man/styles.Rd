@@ -14,7 +14,7 @@ google.style
 \value{
   A list containing the following components:
 
-    \item{layout}{The layout method to use: One of \code{"dot"},
+  \item{layout}{The layout method to use: One of \code{"dot"},
                 \code{"neato"}, and \code{"twopi"}.}
   \item{score}{ character string specifying whether to use total time
                 or self time for coloring nodes/edges; no color used if
@@ -36,9 +36,13 @@ google.style
   \item{nodeSizeScore}{character; value to encode in the size of the nodes.}
   \item{edgeSizeScore}{character; value to encode in the width of the edges.}
   \item{shape}{ character; node shape.}
+  \item{maxnodes}{integer; maximal number of nodes to use; nodes with
+                  lower total hit counts are dropped.}
+  \item{total.pct}{numeric; if positive, nodes with hit percentages
+    below this level are dropped.}	      
 }
 \details{
-  The \code{plain.style} style corresponds to the default parameter setitngs
+  The \code{plain.style} style corresponds to the default parameter settings
   in the display functions. It can be used as the basis for creating a
   new custom style.
 

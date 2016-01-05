@@ -2,7 +2,7 @@
 \alias{profileCallGraph2Dot}
 \title{ Write Call Graph for Rprof Profile Data to Graphviz Dot File }
 \description{
-   Prints a Graphviz .cot file representation of the call graph for profile
+   Prints a Graphviz .dot file representation of the call graph for profile
    data produced by \code{Rprof}.
 }
 \usage{
@@ -16,7 +16,8 @@ profileCallGraph2Dot(pd, score = c("none", "total", "self"),
                      nodeSizeScore = c("none", "total", "self"),
                      edgeSizeScore = c("none", "total"),
                      center = FALSE, size, shape = "ellipse",
-                     layout = "dot", style)
+                     layout = "dot", style, GC = TRUE,
+                     maxnodes = NA, total.pct = 0)
 }
 \arguments{
   \item{pd}{profile data as returned by \code{readProfileData}.}
@@ -29,13 +30,13 @@ profileCallGraph2Dot(pd, score = c("none", "total", "self"),
     specifications as produced by \code{rainbow}; \code{transfer} of
     score is mapped to color }
   \item{filename}{ name of \code{.dot} file }
-  \item{landscape}{ logical; whether to ad the \code{rotate=90} option to
+  \item{landscape}{ logical; whether to add the \code{rotate=90} option to
                     the \code{.dot} file }
   \item{mergeCycles}{ logical; whether to merge each cycle of recursion into
                       a single node }
   \item{edgesColored}{ logical; whether to color edges }
   \item{rankDir}{ character; value to use for the \code{rankdir=} option to
-                  specifythe direction that the plot is laid out using
+                  specify the direction that the plot is laid out using
                   the \code{dot} layout; must be either \code{"TB"} for
                   Top-to-Bottom or \code{"LR"} for Left-to-Right.  The
                   default value is \code{"LR"}.}
@@ -51,6 +52,11 @@ profileCallGraph2Dot(pd, score = c("none", "total", "self"),
   \item{layout}{ character; layout method to use.}
   \item{style}{named list of values for arguments \code{score} through
                \code{layout} to use if not explicitly supplied.}
+  \item{GC}{logical; include GC information or not.}
+  \item{maxnodes}{integer; maximal number of nodes to use; nodes with
+                  lower total hit counts are dropped.}
+  \item{total.pct}{numeric; if positive, nodes with hit percentages
+    below this level are dropped.}	      
 }
 \value{Used for side effect.}
 \details{
@@ -106,7 +112,7 @@ profileCallGraph2Dot(pd, filename = tmp.dot)
 system(sprintf("dot -Tpdf -o%s %s", tmp.pdf, tmp.dot))
 browseURL(sprintf("file://%s", tmp.pdf))
 
-profileCallGraph2Dot(pd, score = "total", filename = tmp.dot)
+profileCallGraph2Dot(pd, filename = tmp.dot)
 system(sprintf("dot -Tpdf -o%s %s", tmp.pdf, tmp.dot))
 browseURL(sprintf("file://%s", tmp.pdf))
 
