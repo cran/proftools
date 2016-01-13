@@ -14,6 +14,9 @@ srcfile <- system.file("samples", "bootlmEx.R", package = "proftools")
 #  pd <- readProfileData(profout)
 #  unlink(profout)
 
+## ----cache = TRUE--------------------------------------------------------
+pd <- profileExpr(source(srcfile))
+
 ## ------------------------------------------------------------------------
 head(funSummary(pd), 10)
 

@@ -1,10 +1,14 @@
-0bab95520c6f4fbf9335874260f668af *DESCRIPTION
+2b2a6bad5ad25ebb6c6379e2922237bf *DESCRIPTION
 7225b37c55374b2b1b63d812abb7269b *NAMESPACE
 6e31eed2c4b4cf55b11218b8f4f3825b *R/plot.R
 af40167eaf713017bcd87c2e31a52454 *R/prof.R
 b6a656a1e20703a4cf08e6a8e0c50e97 *R/proftools.R
 f7c8b48f95d81528ce181107dee1b155 *R/treemap.R
 08e00aa300eeb70023fd0dece593a3d3 *README
+7c4010bdd268e5d97d7f6fb5a6704042 *build/vignette.rds
+15ed3f18c25b3257070b6b9710ec1563 *inst/doc/proftools.R
+db7bb17af719003ba407b5b10d35e2e6 *inst/doc/proftools.Rnw
+ecf45bdff885be49be0e170e98b3d3c6 *inst/doc/proftools.pdf
 4e4a39cb9cb863c1ad4c7a2cec5cfa3a *inst/samples/Rprof-dg.out
 3b6f9cf6ba7b78caae592dbc30a220fc *inst/samples/Rprof-rec.out
 b86a24dcc78714115dae50659b0333e7 *inst/samples/Rprof-rec0.out
@@ -18,7 +22,7 @@ b86a24dcc78714115dae50659b0333e7 *inst/samples/Rprof-rec0.out
 5601956aa55f73191e700a2962d77d03 *inst/samples/rec0.R
 3f5abec516a666b7ce609024f17e8c66 *inst/samples/rec1.R
 ba688a52c0386cec1925a1e70dc71372 *inst/samples/rw.R
-e3b2bd107c68109a297f08140f636947 *man/annotateSource.Rd
+3628699b4054688df084d294f1e7eb6b *man/annotateSource.Rd
 66c3680f7e76f928127f7aee14bde422 *man/callTreeGraphs.Rd
 b487ce3ee581c9d5f2d39bb52a17ad07 *man/filterProfileData.Rd
 51796f8a44e5cdd93700c7fb8f43660f *man/flatProfile.Rd
@@ -34,10 +38,7 @@ fd2020875ed024a06a1389813ce36048 *man/proftools-package.Rd
 d49325a82688462fb8be63f3ee8ca717 *man/summaries.Rd
 cb36a6760988f5961e7c5ec06fa73e84 *man/utils.Rd
 58311b17df51e3ae3bbf8ff68f814301 *man/writeCallGrindFile.Rd
-4f4824ec9066e0f58d18225572542c2f *vignettes/Rprof.cg
+b9564ddd59a06782310989e8f33db55e *vignettes/jsslogo.jpg
 8049d38f8f5f1e31e1844a042b770aa5 *vignettes/kcachegrind.png
-c2aaf8fc86ecd1dd1d34f742e8f6484b *vignettes/proftools.R
 db7bb17af719003ba407b5b10d35e2e6 *vignettes/proftools.Rnw
 90cf4f298c10bfb08510eb5a68142e94 *vignettes/proftools.bib
-6a92c78afaa067d62763621a6c72a7c5 *vignettes/proftools.pdf
-ff5c6c5a5f585fed52180191f25d2289 *vignettes/proftools.tex
