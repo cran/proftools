@@ -9,13 +9,14 @@
 }
 \usage{
 funSummary(pd, byTotal = TRUE, value = c("pct", "time", "hits"),
-           srclines = TRUE, GC = TRUE, self.pct = 0, total.pct = 0)
+           srclines = TRUE, GC = TRUE, memory = FALSE, self.pct = 0, total.pct = 0)
 callSummary(pd, byTotal = TRUE, value = c("pct", "time", "hits"),
-            srclines = TRUE, GC = TRUE, self.pct = 0, total.pct = 0)
+            srclines = TRUE, GC = TRUE, memory = FALSE, self.pct = 0, total.pct = 0)
 pathSummary(pd, value = c("pct", "time", "hits"),
-            srclines = FALSE, GC = TRUE, total.pct = 0, ...)
+            srclines = FALSE, GC = TRUE, memory = FALSE, total.pct = 0, ...)
 srcSummary(pd, byTotal = TRUE, value = c("pct", "time", "hits"),
-           GC = TRUE, total.pct = 0, source = TRUE, width = getOption("width"))
+           GC = TRUE, memory = FALSE, total.pct = 0, source = TRUE,
+           width = getOption("width"))
 }
 \arguments{
   \item{pd}{profile data as returned by \code{readProfileData}.}
@@ -23,6 +24,7 @@ srcSummary(pd, byTotal = TRUE, value = c("pct", "time", "hits"),
   \item{value}{character; show result as percentage, time, or hits.}
   \item{srclines}{logical; include source information, if available, or not.}
   \item{GC}{logical; include GC information or not.}
+  \item{memory}{logical; include memory use information or not.}
   \item{self.pct}{numeric; functions at the bottom of the stacks with
                   self percentages below this value are removed.}
   \item{total.pct}{numeric; functions at the top of the stacks with

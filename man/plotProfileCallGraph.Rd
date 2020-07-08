@@ -2,7 +2,7 @@
 \alias{plotProfileCallGraph}
 \title{ Plot Call Graph for Rprof Profile Data }
 \description{
-  Uses the graph and Rgraphviz packages to plot a call graph for
+  Uses the \pkg{graph} and \pkg{Rgraphviz} packages to plot a call graph for
   profile data produced by \code{Rprof}.
 }
 \usage{
@@ -67,12 +67,15 @@ plotProfileCallGraph(pd, layout = "dot",
   Because of lazy evaluation, nested calls like \code{f(g(x))}
   appear in the profile graph as \code{f} or one of its callees
   calling \code{g}.
+
+  Calls to functions with names containing a \code{|} character are
+  dropped as they cause problems in the \pkg{graph} package.
 }
 
 \references{
   User manual for \code{gprof}, the GNU profiler.
 
-  Graphviz: \url{http://www.research.att.com/sw/tools/graphviz/}
+  Graphviz: \url{https://graphviz.gitlab.io/download/}
 }
 
 \author{ Luke Tierney }
